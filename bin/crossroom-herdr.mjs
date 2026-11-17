@@ -23,8 +23,9 @@ import { fileURLToPath } from 'node:url';
 export const KINDS = ['claude', 'codex', 'opencode', 'gemini'];
 const ROOM = /^[A-Za-z0-9][A-Za-z0-9_-]{3,79}$/;
 const PANE = /^w\d{1,6}:p\d{1,6}$/;
-// What `crossroom launch --in herdr` names an agent when it knows the room.
-const LAUNCHED = /^crossroom-([A-Za-z0-9][A-Za-z0-9_-]{3,79})-([a-l])$/;
+// What `crossroom launch --in herdr` names an agent when it knows the room: in lowercase, as herdr
+// takes names, so the room is matched to it without regard to case.
+const LAUNCHED = /^crossroom-([a-z0-9][a-z0-9_-]{3,79})-([a-l])$/;
 const STATUS = ['idle', 'working', 'blocked', 'done', 'unknown'];
 
 const oneLine = (s, n) =>

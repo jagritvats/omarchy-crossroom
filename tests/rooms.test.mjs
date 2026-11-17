@@ -202,7 +202,7 @@ test('pages a list, and splits rooms into active (what needs you first) and rece
 
 test("reads herdr's agents, and finds those in a room and those free to bring into one", () => {
   const h = R.parseHerdr(JSON.stringify({ available: true, agents: [
-    { pane: 'w2:p1', name: 'crossroom-W2LH37Cf-a', kind: 'claude', status: 'working', dir: 'api', room: 'W2LH37Cf', letter: 'A' },
+    { pane: 'w2:p1', name: 'crossroom-w2lh37cf-a', kind: 'claude', status: 'working', dir: 'api', room: 'w2lh37cf', letter: 'A' },
     { pane: 'w3:p1', name: 'mine', kind: 'codex', status: 'idle', dir: 'web', room: '', letter: '' },
     { pane: 'w4:p1', name: 'old', kind: 'claude', status: 'idle', dir: '', room: 'ENDED123xyz', letter: '' },
     { pane: 'bad', kind: 'x' },

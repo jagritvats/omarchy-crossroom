@@ -38,7 +38,7 @@ function world({ agents = [agent()], add = { status: 0, out: JSON.stringify({ ro
 test('matches each herdr agent to its room: by the name crossroom gave it, or by a seat it was brought into', () => {
   const v = agentsView(
     list([
-      agent({ name: 'crossroom-W2LH37Cf-b', pane_id: 'w2:p2', agent_status: 'working', foreground_cwd: '/home/me/checkout-api/' }),
+      agent({ name: 'crossroom-w2lh37cf-b', pane_id: 'w2:p2', agent_status: 'working', foreground_cwd: '/home/me/checkout-api/' }),
       agent({ name: 'mine', pane_id: 'w3:p1', agent: 'codex' }),
       agent({ pane_id: 'w4:p1' }),
       agent({ pane_id: 'not a pane' }),
@@ -48,7 +48,7 @@ test('matches each herdr agent to its room: by the name crossroom gave it, or by
   );
   assert.equal(v.available, true);
   assert.deepEqual(v.agents, [
-    { pane: 'w2:p2', name: 'crossroom-W2LH37Cf-b', kind: 'claude', status: 'working', dir: 'checkout-api', room: 'W2LH37Cf', letter: 'B' },
+    { pane: 'w2:p2', name: 'crossroom-w2lh37cf-b', kind: 'claude', status: 'working', dir: 'checkout-api', room: 'w2lh37cf', letter: 'B' },
     { pane: 'w3:p1', name: 'mine', kind: 'codex', status: 'idle', dir: 'repo', room: 'Z9a1CDx2abcd', letter: '' },
     { pane: 'w4:p1', name: 'claude', kind: 'claude', status: 'idle', dir: 'repo', room: '', letter: '' },
     { pane: 'w5:p1', name: 'x y', kind: 'claude', status: 'unknown', dir: 'repo', room: '', letter: '' },
