@@ -113,7 +113,30 @@ Second pass, the same day, with crossroom built from the branch that adds `seats
 - The room's own row read "Seat B: quiet, with something waiting for it" at the same time: the
   stall rule and the joined seat's count agree.
 
+Third pass (herdr 0.9.1, crossroom built with `launch --in herdr`):
+
+- `crossroom launch <links> --in herdr --with claude` made a workspace with a pane per seat and
+  started Claude Code in each with its seat line; `herdr agent list` listed both.
+- From the panel, New room > Start in herdr > Claude Code opened a room whose row showed "Seat A ·
+  claude · idle" and "Seat B · claude · idle" with Focus; Focus moved herdr's focus to that agent
+  (`herdr agent list` reported `focused=true`). Agents in no room were listed under Agents in herdr
+  with Into <room>. Live rooms came first; Ended (8) folded the rest.
+- Not run live: Into (bringing a running agent in). The VM's Claude Code had never been set up, so a
+  prompt would have answered its first-run theme screen; `tests/herdr.test.mjs` covers the steps.
+  With a signed-in agent: press Into, and the room should gain a seat and the agent join it.
+
 Learned there:
+- **herdr takes agent names of lowercase letters, digits, `-` and `_`, 1 to 32 characters.** The
+  first start named an agent `crossroom-OUL6glYY-a` and herdr refused it after the room was open.
+  crossroom names them in lowercase now, and the plugin matches a name to a room ignoring case.
+- A start that fails part way leaves the room open with no agent and a herdr workspace with an
+  empty pane: end the room and close the workspace (`herdr workspace close <id>`).
+- herdr calls an agent `idle` and `interactive_ready` while it sits on its own first-run screen: its
+  state says the agent is running, not that it joined the room. The room's own state (Waiting for an
+  agent, Live) says that.
+- `omarchy-launch-terminal-herdr` opens herdr's TUI; herdr panes carry `HERDR_PANE_ID`.
+- With crossroom missing for a moment the watch waited five minutes before trying again; it tries
+  each minute now, and at once when the panel opens.
 - A long one-line `guestcontrol run` failed with `VERR_NOT_SUPPORTED`; the same commands as a
   script copied in (`guestcontrol copyto`) ran. Keep scenes in a script file.
 - `qs.Ui` has no `Label` or `ActionButton`; Dolly defines both inline. The shell logged

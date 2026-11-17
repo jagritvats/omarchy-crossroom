@@ -2,6 +2,8 @@
 
 ## 0.1.0
 
+herdr: start a new room's agents in herdr, see each seat's agent there (working, waiting) with Focus, and bring an agent already running in herdr into a room. Live rooms first, six at a time; ended rooms fold away; middle-click reads the room that needs you in the panel.
+
 View reads a room in the panel (its events, local time, live). Joined from this computer lists the seats your agents here took in rooms, anyone's, and opens a seat's own page (needs crossroom 0.3.2).
 
 

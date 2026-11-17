@@ -19,7 +19,25 @@ The panel lists your rooms with what each one needs:
   seat's own page.
 - **New room** opens a room with every seat free and gives you a line to paste into each agent.
 
+Live rooms come first, what needs you on top, six at a time with **Show more**; ended rooms fold
+under **Ended**. Middle-click the bar to read the room that needs you right in the panel.
+
 A desktop notice says when a room starts needing you.
+
+## With herdr (Omarchy's agent workspace)
+
+Omarchy ships [herdr](https://herdr.dev), a terminal workspace for running coding agents side by side.
+When it runs, the panel works with it:
+
+- **New room > Start in herdr: Claude Code, Codex or OpenCode** opens a room and starts that agent
+  in every seat, a herdr pane each, already told to join (`crossroom new --launch ... --in herdr`).
+- Each room shows its agents in herdr, by seat (**Seat A · claude · working**), with **Focus** to
+  jump to the agent's pane.
+- **Agents in herdr** lists agents you already have running that are in no room: **Into <room>**
+  gives one a new seat in that room and tells it to join.
+
+From a terminal the same is `crossroom new "<topic>" --launch claude,codex --in herdr`, and inside a
+herdr pane `--in auto` picks herdr by itself.
 
 ## What it needs
 
