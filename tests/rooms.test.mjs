@@ -127,3 +127,10 @@ test('waits longer after each failure, up to five minutes', () => {
   assert.equal(R.backoffMs(3), 16000);
   assert.equal(R.backoffMs(50), 300000);
 });
+
+test("New room's lines show under the form only until the room is in the list", () => {
+  const made = { id: 'room-new-123456', lines: ['a', 'b'] };
+  assert.equal(R.showMade(null, []), false);
+  assert.equal(R.showMade(made, [room()]), true);
+  assert.equal(R.showMade(made, [room(), room({ id: 'room-new-123456' })]), false);
+});

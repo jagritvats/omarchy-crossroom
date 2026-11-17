@@ -45,6 +45,7 @@ Panel {
   property string newState: ""        // "", "opening", "failed"
   property var made: null             // the room New room just opened: {id, short, title, lines}
   property string copied: ""          // what was copied last, to say so on its button
+  property string topicText: ""       // the topic field, cleared once its room opens
 
   function open() { root.controller.show() }
   function close() { root.controller.hide() }
@@ -90,6 +91,7 @@ Panel {
       if (!room) { root.newState = "failed"; return }
       root.newState = ""
       root.made = room
+      root.topicText = ""
       if (hostWidget) hostWidget.rememberNewRoom(room)
     }
   }
@@ -260,6 +262,8 @@ Panel {
               objectName: "crossroom-topic"
               width: parent.width
               placeholderText: tr.t("panel.topicPlaceholder")
+              text: root.topicText
+              onTextEdited: root.topicText = text
               onAccepted: root.startRoom(text)
             }
             Row {
@@ -288,12 +292,12 @@ Panel {
               text: tr.t("panel.newFailed")
             }
             Label {
-              visible: !!root.made
+              visible: Rooms.showMade(root.made, root.listed)
               width: parent.width; wrapMode: Text.Wrap; color: root.fg
               text: tr.t("panel.newDone")
             }
             Flow {
-              visible: !!root.made
+              visible: Rooms.showMade(root.made, root.listed)
               width: parent.width; spacing: Style.space(4)
               Repeater {
                 model: root.made ? root.made.lines : []
