@@ -164,7 +164,8 @@ test('lib/rooms.js is plain ES5 a QML .pragma library can load', () => {
   assert.ok(loadRooms().parseLine);
   for (const [i, c] of [...s].entries()) {
     const p = c.codePointAt(0);
-    // The bar's mark is a Nerd Font glyph; nothing else above ASCII.
-    if (p > 0x7e) assert.equal(p, 0xf0b79, `character U+${p.toString(16)} at ${i}`);
+    // The bar's mark (a Nerd Font glyph) and the middle dot the view puts between who and what;
+    // nothing else above ASCII, so an escape the editor turned into its character shows up here.
+    if (p > 0x7e) assert.ok(p === 0xf0b79 || p === 0xb7, `character U+${p.toString(16)} at ${i}`);
   }
 });

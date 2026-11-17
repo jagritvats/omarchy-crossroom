@@ -107,7 +107,12 @@ Panel {
 
   Process {
     id: viewProc
-    stdout: SplitParser { onRead: function(data) { root.viewLines = Rooms.viewAppend(root.viewLines, data) } }
+    stdout: SplitParser {
+      onRead: function(data) {
+        var shown = Rooms.viewLine(data, -new Date().getTimezoneOffset())
+        if (shown !== null) root.viewLines = Rooms.viewAppend(root.viewLines, shown)
+      }
+    }
     onExited: function(code) { if (root.viewing) root.viewState = code === 0 ? "done" : "failed" }
   }
 

@@ -174,3 +174,15 @@ test("a room's view keeps its newest lines, one line each", () => {
   assert.deepEqual(plain(R.viewAppend(['a'], '   ')), ['a']);
   assert.equal(R.viewAppend([], `x${String.fromCodePoint(0x2028)}y`)[0], 'x y');
 });
+
+test('a watch line reads as local time, who, and what they did; bookkeeping is left out', () => {
+  assert.equal(R.viewLine('#7 12:34:46 message (A Payments): Retries live in payments/retry.ts', 330), '18:04  A Payments: Retries live in payments/retry.ts');
+  assert.equal(R.viewLine('#4 12:34:46 participant_joined (A Payments)', 0), '12:34  A Payments joined');
+  assert.equal(R.viewLine('#9 23:50:00 context_requested (B Checkout): Which region?', 30), '00:20  B Checkout asked: Which region?');
+  assert.equal(R.viewLine('#1 00:10:00 session_created (crossroom): Checkout', -60), '23:10  Room opened: Checkout');
+  assert.equal(R.viewLine('#20 10:00:00 session_ended (owner): done', 0), '10:00  Room ended: done');
+  assert.equal(R.viewLine('#12 10:00:00 message (owner): ok', 0), '10:00  You: ok');
+  assert.equal(R.viewLine('#13 10:00:00 claim_created (A x): it is', 0), '10:00  A x · claim created: it is');
+  for (const t of ['brief_set', 'session_started', 'participant_state', 'participant_attention']) assert.equal(R.viewLine(`#2 10:00:00 ${t} (crossroom)`, 0), null);
+  assert.equal(R.viewLine('crossroom: some notice', 0), 'crossroom: some notice');
+});
