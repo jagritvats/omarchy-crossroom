@@ -504,7 +504,7 @@ Panel {
                   model: Rooms.paged(root.active, 3).items
                   delegate: ActionButton {
                     required property var modelData
-                    text: tr.t("panel.into").arg(modelData.title ? modelData.title.slice(0, 18) : modelData.short)
+                    text: tr.t("panel.into").arg(Rooms.shortTitle(modelData, 18))
                     iconText: "󰁔"; bordered: true; foreground: root.fg; fontFamily: root.ff
                     enabled: freeRow.modelData.status === "idle" || freeRow.modelData.status === "done" || freeRow.modelData.status === "unknown"
                     onClicked: if (hostWidget) hostWidget.bringAgent(modelData.id, freeRow.modelData.pane)
@@ -544,10 +544,11 @@ Panel {
                 }
               }
             }
-            Row {
+            Flow {
               visible: root.herdr.available
+              width: parent.width
               spacing: Style.space(4)
-              Label { anchors.verticalCenter: parent.verticalCenter; text: tr.t("panel.herdrStart"); color: root.dim }
+              Label { height: Style.space(30); verticalAlignment: Text.AlignVCenter; text: tr.t("panel.herdrStart"); color: root.dim }
               Repeater {
                 model: ["", "claude", "codex", "opencode"]
                 delegate: ActionButton {

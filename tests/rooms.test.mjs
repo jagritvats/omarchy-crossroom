@@ -224,3 +224,11 @@ test("reads herdr's agents, and finds those in a room and those free to bring in
   assert.equal(R.safeKind('codex'), 'codex');
   assert.equal(R.safeKind('bash'), '');
 });
+
+test("a room's name for a button: cut at a word, never on punctuation", () => {
+  assert.equal(R.shortTitle({ title: 'Herdr launch test: say hello', short: 'VQ9JWxDb' }, 18), 'Herdr launch test…');
+  assert.equal(R.shortTitle({ title: 'Ship it', short: 'x' }, 18), 'Ship it');
+  assert.equal(R.shortTitle({ title: 'Release notes:', short: 'x' }, 18), 'Release notes');
+  assert.equal(R.shortTitle({ title: '', short: 'VQ9JWxDb' }, 18), 'VQ9JWxDb');
+  assert.equal(R.shortTitle({ title: 'Supercalifragilisticexpialidocious', short: 'x' }, 10), 'Supercalif…');
+});
