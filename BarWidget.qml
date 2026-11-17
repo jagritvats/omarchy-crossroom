@@ -40,6 +40,9 @@ BarWidget {
   property var noticeKeys: null
   // Seat lines of rooms opened from the panel in this session, by room id. In memory only.
   property var newLines: ({})
+  // herdr (Omarchy's agent workspace): its agents, each matched to a room where it holds a seat.
+  property var herdr: ({ available: false, agents: [] })
+  property string herdrNote: ""       // what the last "bring into a room" did, in a line
 
   readonly property int needsYou: state ? state.needsYou : 0
   readonly property int live: state ? state.live : 0
@@ -56,6 +59,26 @@ BarWidget {
   function openRoom(short) {
     var s = Rooms.safeShort(short)
     if (s) run(["open", s])
+  }
+  // ---- herdr
+  function refreshHerdr() { if (!herdrProc.running) herdrProc.running = true }
+  function focusAgent(pane) {
+    var p = Rooms.safePane(pane)
+    if (p) run(["herdr", "focus", p])
+  }
+  // A new seat in a room opened here, and the agent in that pane told to take it.
+  function bringAgent(roomId, pane) {
+    var r = Rooms.safeShort(roomId), p = Rooms.safePane(pane)
+    if (!r || !p || bringProc.running) return
+    root.herdrNote = ""
+    bringProc.command = [root.launcher, "herdr", "bring", r, p]
+    bringProc.running = true
+  }
+
+  // A seat an agent here took, by its key (a digest of its link: the link stays in crossroom).
+  function openSeat(key) {
+    var k = Rooms.safeSeatKey(key)
+    if (k) run(["open-seat", k])
   }
   function copyLink(short) {
     var s = Rooms.safeShort(short)
@@ -87,6 +110,12 @@ BarWidget {
     }
   }
 
+  // The panel opened while the watch was down: try again now rather than at the end of its pause.
+  function retryWatch() {
+    if (watchProc.running || root.status === "ok" || root.status === "starting") return
+    restart.stop()
+    startWatch()
+  }
   function startWatch() {
     watchProc.command = [root.launcher, "watch", String(root.intervalS())]
     watchProc.running = true
@@ -140,11 +169,34 @@ BarWidget {
       else if (code === 3) root.status = "old"
       else root.status = "stopped"
       root.failures++
-      restart.interval = (code === 127 || code === 3) ? 300000 : Rooms.backoffMs(root.failures)
+      // Missing or too old: look again each minute (and at once when the panel opens), so an install shows soon.
+      restart.interval = (code === 127 || code === 3) ? 60000 : Rooms.backoffMs(root.failures)
       restart.restart()
     }
   }
   Timer { id: restart; repeat: false; onTriggered: root.startWatch() }
+
+  Process {
+    id: herdrProc
+    command: [root.launcher, "herdr", "agents"]
+    stdout: StdioCollector { id: herdrOut; onStreamFinished: root.herdr = Rooms.parseHerdr(herdrOut.text) }
+  }
+  // Often while the panel is open, seldom otherwise: herdr's state is a local socket, cheap to ask.
+  Timer {
+    interval: root.opened ? 4000 : 30000
+    repeat: true; running: true; triggeredOnStart: true
+    onTriggered: root.refreshHerdr()
+  }
+  Process {
+    id: bringProc
+    stdout: StdioCollector { id: bringOut }
+    stderr: StdioCollector { id: bringErr }
+    onExited: function(code) {
+      root.herdrNote = code === 0 ? tr.t("panel.herdrBrought")
+                                  : tr.t("panel.herdrBringFailed").arg(String(bringErr.text || "").split("\n")[0].slice(0, 160))
+      root.refreshHerdr()
+    }
+  }
 
   Process {
     id: copyProc
@@ -184,8 +236,9 @@ BarWidget {
                : tr.t("bar.tooltip.idle")
     onPressed: function(b) {
       if (b === Qt.MiddleButton) {
-        var first = Rooms.shown(root.rooms, 0)[0]
-        if (first) root.openRoom(first.short)
+        // The room that needs you (else the latest live one), read right in the panel.
+        var first = Rooms.activeRooms(root.rooms)[0]
+        if (first && panelLoader.item) { panelLoader.item.open(); panelLoader.item.viewRoom(first) }
         return
       }
       root.toggle()

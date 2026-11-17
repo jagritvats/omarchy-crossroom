@@ -52,8 +52,10 @@ test('every string the QML asks for is in i18n/en.json, and every string there i
   const used = new Set();
   for (const s of Object.values(src)) for (const m of s.matchAll(/tr\.t\("([^"]+)"\s*[,)]/g)) used.add(m[1]);
   // Keys built in lib/rooms.js (reasons, notices) and from a room's state.
-  for (const m of read('lib/rooms.js').matchAll(/"((?:room|notice)\.[A-Za-z.]+)"/g)) used.add(m[1]);
+  for (const m of read('lib/rooms.js').matchAll(/"((?:room|notice|seat)\.[A-Za-z.]+)"/g)) used.add(m[1]);
   for (const st of ['live', 'open', 'ended', 'gone', 'unknown']) used.add(`state.${st}`);
+  for (const st of ['idle', 'working', 'blocked', 'done', 'unknown']) used.add(`herdr.${st}`);
+  for (const k of ['claude', 'codex', 'opencode']) used.add(`herdr.kind.${k}`);
   for (const k of used) assert.ok(k in en, `missing string: ${k}`);
   // Two section headings are kept for the next panel layout; nothing else may sit unused.
   const spare = new Set(['panel.needsYou', 'panel.rooms']);
@@ -70,14 +72,18 @@ test('every command goes through bin/crossroom-bar with fixed words and room ids
     for (const m of s.matchAll(/command(?:\s*:|\s*=)\s*(\[[^\]]*\]|args)/g)) {
       assert.ok(/^\[root\.launcher\b/.test(m[1]) || m[1] === 'args', `${f}: command ${m[1]}`);
     }
-    for (const m of s.matchAll(/\brun\(\["([^"]+)"/g)) assert.ok(['open', 'copy-link'].includes(m[1]), `${f}: run ${m[1]}`);
+    for (const m of s.matchAll(/\brun\(\["([^"]+)"/g)) assert.ok(['open', 'copy-link', 'open-seat', 'herdr'].includes(m[1]), `${f}: run ${m[1]}`);
   }
-  // `args` in the panel is built from the launcher, "new", a seat count and the cleaned topic.
-  assert.match(src['RoomsPanel.qml'], /var args = \[root\.launcher, "new", String\(root\.seats\)\]/);
+  // `args` in the panel is built from the launcher, "new", a seat count and the cleaned topic ...
+  // ... or, to start the agents in herdr, from a kind that passed safeKind.
+  assert.match(src['RoomsPanel.qml'], /var kind = Rooms\.safeKind\(root\.herdrKind\)\s*\n\s*var args = kind \? \[root\.launcher, "herdr", "start", String\(root\.seats\), kind\] : \[root\.launcher, "new", String\(root\.seats\)\]/);
   assert.match(src['RoomsPanel.qml'], /var t = Rooms\.topicArg\(topic\)/);
   // A room id passes to a command only through safeShort.
   assert.match(src['BarWidget.qml'], /var s = Rooms\.safeShort\(short\)\s*\n\s*if \(s\) run\(\["open", s\]\)/);
   assert.match(src['BarWidget.qml'], /var s = Rooms\.safeShort\(short\)\s*\n\s*if \(s\) run\(\["copy-link", s\]\)/);
+  // A seat passes only by its key, and a room's view only by its id.
+  assert.match(src['BarWidget.qml'], /var k = Rooms\.safeSeatKey\(key\)\s*\n\s*if \(k\) run\(\["open-seat", k\]\)/);
+  assert.match(src['RoomsPanel.qml'], /var s = Rooms\.safeShort\(r\.short\)[\s\S]{0,200}viewProc\.command = \[root\.launcher, "view", s\]/);
 });
 
 test('a notice says a fixed sentence and a count: no title, no id, no seat line', () => {
@@ -161,7 +167,8 @@ test('lib/rooms.js is plain ES5 a QML .pragma library can load', () => {
   assert.ok(loadRooms().parseLine);
   for (const [i, c] of [...s].entries()) {
     const p = c.codePointAt(0);
-    // The bar's mark is a Nerd Font glyph; nothing else above ASCII.
-    if (p > 0x7e) assert.equal(p, 0xf0b79, `character U+${p.toString(16)} at ${i}`);
+    // The bar's mark (a Nerd Font glyph) and the middle dot the view puts between who and what;
+    // nothing else above ASCII, so an escape the editor turned into its character shows up here.
+    if (p > 0x7e) assert.ok(p === 0xf0b79 || p === 0xb7, `character U+${p.toString(16)} at ${i}`);
   }
 });

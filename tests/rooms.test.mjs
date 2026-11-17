@@ -134,3 +134,101 @@ test("New room's lines show under the form only until the room is in the list", 
   assert.equal(R.showMade(made, [room()]), true);
   assert.equal(R.showMade(made, [room(), room({ id: 'room-new-123456' })]), false);
 });
+
+const seat = (o = {}) => ({ key: '0123456789ab', title: 'Why did checkout break?', letter: 'B', name: 'Claude Code', room: 'live', pending: 0, dir: 'checkout-api', held: true, at: '2026-11-17T10:00:00Z', ...o });
+
+test('reads the seats this computer took, by key, live first; none from an older crossroom', () => {
+  const s = R.parseLine(JSON.stringify({ type: 'rooms', rooms: [], seats: [
+    seat({ key: 'aaaaaaaaaaaa', room: 'ended', at: '2026-11-17T12:00:00Z' }),
+    seat(),
+    { key: 'https://x/j/token', title: 'a link is no key' },
+    seat({ key: 'bbbbbbbbbbbb', letter: 'zz', room: 'weird', pending: -1 }),
+  ] }));
+  assert.deepEqual(plain(s.seats.map((x) => x.key)), ['0123456789ab', 'aaaaaaaaaaaa', 'bbbbbbbbbbbb']);
+  assert.equal(s.seats[2].letter, '');
+  assert.equal(s.seats[2].room, 'unreachable');
+  assert.equal(s.seats[2].pending, 0);
+  assert.deepEqual(plain(R.parseLine(line([room()])).seats), []);
+});
+
+test("a seat's row says what waits for its agent, and when no session holds it", () => {
+  assert.deepEqual(plain(R.seatReasons(R.cleanSeat(seat({ pending: 3, held: false })))), [
+    { key: 'seat.pending.other', args: ['3'] },
+    { key: 'seat.unheld', args: [] },
+  ]);
+  assert.equal(R.seatReasons(R.cleanSeat(seat({ pending: 1 })))[0].key, 'seat.pending.one');
+  assert.deepEqual(plain(R.seatReasons(R.cleanSeat(seat({ room: 'ended', pending: 2, held: false })))), []);
+});
+
+test('only a seat key passes to a command', () => {
+  assert.equal(R.safeSeatKey('0123456789ab'), '0123456789ab');
+  for (const bad of ['', '0123456789AB', '0123456789abc', '--open', 'https://x/j/t']) assert.equal(R.safeSeatKey(bad), '', bad);
+});
+
+test("a room's view keeps its newest lines, one line each", () => {
+  let v = [];
+  for (let i = 0; i < 200; i++) v = R.viewAppend(v, `#${i} message`);
+  assert.equal(v.length, 150);
+  assert.equal(v.at(-1), '#199 message');
+  assert.equal(v[0], '#50 message');
+  assert.deepEqual(plain(R.viewAppend(['a'], '   ')), ['a']);
+  assert.equal(R.viewAppend([], `x${String.fromCodePoint(0x2028)}y`)[0], 'x y');
+});
+
+test('a watch line reads as local time, who, and what they did; bookkeeping is left out', () => {
+  assert.equal(R.viewLine('#7 12:34:46 message (A Payments): Retries live in payments/retry.ts', 330), '18:04  A Payments: Retries live in payments/retry.ts');
+  assert.equal(R.viewLine('#4 12:34:46 participant_joined (A Payments)', 0), '12:34  A Payments joined');
+  assert.equal(R.viewLine('#9 23:50:00 context_requested (B Checkout): Which region?', 30), '00:20  B Checkout asked: Which region?');
+  assert.equal(R.viewLine('#1 00:10:00 session_created (crossroom): Checkout', -60), '23:10  Room opened: Checkout');
+  assert.equal(R.viewLine('#20 10:00:00 session_ended (owner): done', 0), '10:00  Room ended: done');
+  assert.equal(R.viewLine('#12 10:00:00 message (owner): ok', 0), '10:00  You: ok');
+  assert.equal(R.viewLine('#13 10:00:00 claim_created (A x): it is', 0), '10:00  A x · claim created: it is');
+  for (const t of ['brief_set', 'session_started', 'participant_state', 'participant_attention']) assert.equal(R.viewLine(`#2 10:00:00 ${t} (crossroom)`, 0), null);
+  assert.equal(R.viewLine('crossroom: some notice', 0), 'crossroom: some notice');
+});
+
+test('pages a list, and splits rooms into active (what needs you first) and recent', () => {
+  assert.deepEqual(plain(R.paged([1, 2, 3, 4, 5], 2)), { items: [1, 2], more: 3 });
+  assert.deepEqual(plain(R.paged([1], 6)), { items: [1], more: 0 });
+  const s = R.parseLine(line([
+    room({ id: 'ended-1-aaaa', state: 'ended' }),
+    room({ id: 'live-1-aaaaa', lastActivityAt: '2026-11-17T12:00:00Z' }),
+    room({ id: 'needs-1-aaaa', yourTurn: 1 }),
+    room({ id: 'gone-1-aaaaa', state: 'gone' }),
+  ]));
+  assert.deepEqual(plain(R.activeRooms(s.rooms).map((r) => r.id)), ['needs-1-aaaa', 'live-1-aaaaa']);
+  assert.deepEqual(plain(R.recentRooms(s.rooms).map((r) => r.id)), ['ended-1-aaaa']);
+});
+
+test("reads herdr's agents, and finds those in a room and those free to bring into one", () => {
+  const h = R.parseHerdr(JSON.stringify({ available: true, agents: [
+    { pane: 'w2:p1', name: 'crossroom-w2lh37cf-a', kind: 'claude', status: 'working', dir: 'api', room: 'w2lh37cf', letter: 'A' },
+    { pane: 'w3:p1', name: 'mine', kind: 'codex', status: 'idle', dir: 'web', room: '', letter: '' },
+    { pane: 'w4:p1', name: 'old', kind: 'claude', status: 'idle', dir: '', room: 'ENDED123xyz', letter: '' },
+    { pane: 'bad', kind: 'x' },
+    { pane: 'w5:p1', status: 'odd', room: '--x', letter: 'zz' },
+  ] }));
+  assert.equal(h.available, true);
+  assert.equal(h.agents.length, 4);
+  assert.equal(h.agents[3].status, 'unknown');
+  assert.equal(h.agents[3].room, '');
+  const rooms = [room({ id: 'W2LH37Cf6ekB' }), room({ id: 'ENDED123xyzA', state: 'ended' })];
+  assert.deepEqual(plain(R.herdrIn(h.agents, rooms[0]).map((a) => a.pane)), ['w2:p1']);
+  assert.deepEqual(plain(R.herdrFree(h.agents, rooms).map((a) => a.pane)), ['w3:p1', 'w4:p1', 'w5:p1']);
+  assert.equal(R.herdrLabel(h.agents[0]), 'Seat A · claude  ·  api');
+  assert.equal(R.herdrLabel(h.agents[1]), 'codex  ·  web');
+  assert.deepEqual(plain(R.parseHerdr('{"available":false}')), { available: false, agents: [] });
+  assert.deepEqual(plain(R.parseHerdr('junk')), { available: false, agents: [] });
+  assert.equal(R.safePane('w1:p2'), 'w1:p2');
+  assert.equal(R.safePane('w1:p2; x'), '');
+  assert.equal(R.safeKind('codex'), 'codex');
+  assert.equal(R.safeKind('bash'), '');
+});
+
+test("a room's name for a button: cut at a word, never on punctuation", () => {
+  assert.equal(R.shortTitle({ title: 'Herdr launch test: say hello', short: 'VQ9JWxDb' }, 18), 'Herdr launch test…');
+  assert.equal(R.shortTitle({ title: 'Ship it', short: 'x' }, 18), 'Ship it');
+  assert.equal(R.shortTitle({ title: 'Release notes:', short: 'x' }, 18), 'Release notes');
+  assert.equal(R.shortTitle({ title: '', short: 'VQ9JWxDb' }, 18), 'VQ9JWxDb');
+  assert.equal(R.shortTitle({ title: 'Supercalifragilisticexpialidocious', short: 'x' }, 10), 'Supercalif…');
+});

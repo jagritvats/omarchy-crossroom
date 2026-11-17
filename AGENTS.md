@@ -101,7 +101,44 @@ Against app.crossroom.dev, with crossroom built from the branch that adds `rooms
 - `omarchy bar set io.github.jagritvats.crossroom interval 30` restarted the watch at once with
   `--interval 30`. Ending the rooms cleared the bar; ended rows keep Open and Copy link.
 
+Second pass, the same day, with crossroom built from the branch that adds `seats` to each line and
+`seats --open`:
+
+- **View** on a room opened the room in the panel: its history as "18:04  A Payments: …",
+  "… joined", local time, the bookkeeping events left out (`viewLine`). A message seat B said while
+  it was open appeared within seconds. Back returned to the list.
+- **Joined from this computer** listed a seat recorded with `crossroom seat <link>`: "Seat B ·
+  Checkout · crossroom-test · Live", "1 new for its agent", "No session holds it: /crossroom:resume
+  takes it up". Open on it opened the seat's own page (`/seat#t=`, "You are Agent B").
+- The room's own row read "Seat B: quiet, with something waiting for it" at the same time: the
+  stall rule and the joined seat's count agree.
+
+Third pass (herdr 0.9.1, crossroom built with `launch --in herdr`):
+
+- `crossroom launch <links> --in herdr --with claude` made a workspace with a pane per seat and
+  started Claude Code in each with its seat line; `herdr agent list` listed both.
+- From the panel, New room > Start in herdr > Claude Code opened a room whose row showed "Seat A ·
+  claude · idle" and "Seat B · claude · idle" with Focus; Focus moved herdr's focus to that agent
+  (`herdr agent list` reported `focused=true`). Agents in no room were listed under Agents in herdr
+  with Into <room>. Live rooms came first; Ended (8) folded the rest.
+- Not run live: Into (bringing a running agent in). The VM's Claude Code had never been set up, so a
+  prompt would have answered its first-run theme screen; `tests/herdr.test.mjs` covers the steps.
+  With a signed-in agent: press Into, and the room should gain a seat and the agent join it.
+
 Learned there:
+- **herdr takes agent names of lowercase letters, digits, `-` and `_`, 1 to 32 characters.** The
+  first start named an agent `crossroom-OUL6glYY-a` and herdr refused it after the room was open.
+  crossroom names them in lowercase now, and the plugin matches a name to a room ignoring case.
+- A start that fails part way leaves the room open with no agent and a herdr workspace with an
+  empty pane: end the room and close the workspace (`herdr workspace close <id>`).
+- herdr calls an agent `idle` and `interactive_ready` while it sits on its own first-run screen: its
+  state says the agent is running, not that it joined the room. The room's own state (Waiting for an
+  agent, Live) says that.
+- `omarchy-launch-terminal-herdr` opens herdr's TUI; herdr panes carry `HERDR_PANE_ID`.
+- With crossroom missing for a moment the watch waited five minutes before trying again; it tries
+  each minute now, and at once when the panel opens.
+- A long one-line `guestcontrol run` failed with `VERR_NOT_SUPPORTED`; the same commands as a
+  script copied in (`guestcontrol copyto`) ran. Keep scenes in a script file.
 - `qs.Ui` has no `Label` or `ActionButton`; Dolly defines both inline. The shell logged
   "Label is not a type" and the panel never opened. `tests/static.test.mjs` now holds every type to
   the shell's, Qt's, Quickshell's or an inline component.
@@ -134,7 +171,7 @@ covered headlessly by `tests/launcher.test.mjs`), 9 with a real agent, 12, 15 to
 |---|------|-----|--------|
 | 1 | Manifest | `omarchy plugin validate .` | passes. `category: "Productivity"` is a guess and may need to be a value the shell knows |
 | 2 | Install | commit, then `omarchy plugin add "file://$PWD" --enable --yes` | the mark appears in the bar's right section; `qs log` shows no QML errors |
-| 3 | No crossroom | uninstall the CLI, reload the shell | tooltip and panel say to install it; the watch retries every 5 min, not in a loop |
+| 3 | No crossroom | uninstall the CLI, reload the shell | tooltip and panel say to install it; the watch tries again each minute, and at once when the panel opens; never in a loop |
 | 4 | Old crossroom | install 0.3.0 | "update the crossroom command"; exit 3 path |
 | 5 | Shell PATH | install crossroom with npm under mise | `bin/crossroom-bar which` from the shell finds it (`~/.local/share/mise/shims`); if not, add the dir to the launcher's list |
 | 6 | Rooms show | `crossroom new "test" --seats 2` in a terminal, paste a line into Claude Code | the room appears live in the panel; Open opens it in the browser with its key |
