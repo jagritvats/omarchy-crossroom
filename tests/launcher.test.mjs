@@ -136,3 +136,17 @@ test('which names the command it found', () => {
   assert.equal(r.status, 0);
   assert.match(r.stdout, /crossroom\n$/);
 });
+
+test("view streams the room's readable lines, and open-seat opens a seat by its key, each checked first", () => {
+  const w = world();
+  assert.equal(w.run(['view', 'abcd1234']).status, 0);
+  assert.deepEqual(w.calls().at(-1), ['watch', 'abcd1234', '--no-signals']);
+  assert.equal(w.run(['open-seat', '0123456789ab']).status, 0);
+  assert.deepEqual(w.calls().at(-1), ['seats', '--open', '0123456789ab']);
+  const before = w.calls().length;
+  for (const bad of ['--json', '0123456789AB', 'https://x/j/t', '']) {
+    assert.equal(w.run(['open-seat', bad]).status, 2, bad);
+    assert.equal(w.run(['view', bad === '' ? '' : `-${bad}`]).status, 2, bad);
+  }
+  assert.equal(w.calls().length, before);
+});

@@ -7,6 +7,8 @@
 #   crossroom-bar which               where `crossroom` is (exit 127 when it is not found)
 #   crossroom-bar watch <seconds>     `crossroom rooms --watch --json`, one state a line
 #   crossroom-bar open <room>         the room's page in the browser (`crossroom open`)
+#   crossroom-bar view <room>         the room's events as readable lines, until it ends (`crossroom watch`)
+#   crossroom-bar open-seat <key>     the page of a seat an agent here took (`crossroom seats --open`)
 #   crossroom-bar copy-link <room>    the room's private link onto the clipboard
 #   crossroom-bar copy                stdin onto the clipboard (a seat's line the panel holds)
 #   crossroom-bar new <seats> [<topic>]   a room with every seat free; prints its seat lines as JSON
@@ -44,6 +46,8 @@ version_at_least() {
   return 0
 }
 
+seat_ok() { [[ "${1:-}" =~ ^[0-9a-f]{12}$ ]]; }
+
 room_ok() { [[ "${1:-}" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{3,79}$ ]]; }
 
 copy_stdin() {
@@ -80,6 +84,16 @@ case "$cmd" in
     room_ok "${1:-}" || { echo "open takes a room id" >&2; exit 2; }
     exec "$cr" open "$1"
     ;;
+  view)
+    room_ok "${1:-}" || { echo "view takes a room id" >&2; exit 2; }
+    # The readable form: participants' text arrives one line an event, control characters and
+    # bidi overrides blanked by crossroom itself.
+    exec "$cr" watch "$1" --no-signals
+    ;;
+  open-seat)
+    seat_ok "${1:-}" || { echo "open-seat takes a seat key" >&2; exit 2; }
+    exec "$cr" seats --open "$1"
+    ;;
   copy-link)
     room_ok "${1:-}" || { echo "copy-link takes a room id" >&2; exit 2; }
     command -v wl-copy >/dev/null 2>&1 || { echo "wl-copy is not installed (the wl-clipboard package)." >&2; exit 4; }
@@ -96,7 +110,7 @@ case "$cmd" in
     exec "$cr" new --no-seat --json --seats "$seats"
     ;;
   *)
-    echo "usage: crossroom-bar which | watch <seconds> | open <room> | copy-link <room> | copy | new <seats> [<topic>]" >&2
+    echo "usage: crossroom-bar which | watch <seconds> | open <room> | view <room> | open-seat <key> | copy-link <room> | copy | new <seats> [<topic>]" >&2
     exit 2
     ;;
 esac

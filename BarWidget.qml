@@ -57,6 +57,11 @@ BarWidget {
     var s = Rooms.safeShort(short)
     if (s) run(["open", s])
   }
+  // A seat an agent here took, by its key (a digest of its link: the link stays in crossroom).
+  function openSeat(key) {
+    var k = Rooms.safeSeatKey(key)
+    if (k) run(["open-seat", k])
+  }
   function copyLink(short) {
     var s = Rooms.safeShort(short)
     if (s) run(["copy-link", s])

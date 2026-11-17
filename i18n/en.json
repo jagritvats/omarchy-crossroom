@@ -5,7 +5,6 @@
   "bar.tooltip.missing": "Crossroom · install the crossroom command to see your rooms",
   "bar.tooltip.old": "Crossroom · update the crossroom command to see your rooms",
   "bar.tooltip.starting": "Crossroom · reading your rooms…",
-
   "panel.title": "Crossroom",
   "panel.needsYou": "Needs you",
   "panel.rooms": "Rooms",
@@ -25,21 +24,28 @@
   "panel.starting": "Opening…",
   "panel.newDone": "Paste one line into each agent:",
   "panel.newFailed": "The room didn't open. `crossroom new` in a terminal says why.",
-
   "state.live": "Live",
   "state.open": "Waiting for an agent",
   "state.ended": "Ended",
   "state.gone": "Deleted",
   "state.unknown": "Unreachable",
-
   "room.yourTurn.one": "Your turn: an agent asked you a question",
   "room.yourTurn.other": "Your turn: %1 questions for you",
   "room.approval": "Seat %1: waiting for its user to approve a step",
   "room.asking": "Seat %1: asking its user something",
   "room.stalled": "Seat %1: quiet, with something waiting for it",
   "room.away": "Seat %1: stepped away",
-
   "notice.title": "Crossroom",
   "notice.one": "A room needs you.",
-  "notice.other": "%1 rooms need you."
+  "notice.other": "%1 rooms need you.",
+  "panel.view": "View",
+  "panel.back": "Back",
+  "panel.viewReading": "Reading the room…",
+  "panel.viewFailed": "This room couldn't be read. Open shows it in the browser.",
+  "panel.joined": "Joined from this computer",
+  "panel.openSeat": "Open",
+  "panel.untitled": "A Crossroom room",
+  "seat.pending.one": "1 new for its agent",
+  "seat.pending.other": "%1 new for its agent",
+  "seat.unheld": "No session holds it: /crossroom:resume takes it up"
 }

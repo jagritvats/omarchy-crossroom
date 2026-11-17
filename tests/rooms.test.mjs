@@ -134,3 +134,43 @@ test("New room's lines show under the form only until the room is in the list", 
   assert.equal(R.showMade(made, [room()]), true);
   assert.equal(R.showMade(made, [room(), room({ id: 'room-new-123456' })]), false);
 });
+
+const seat = (o = {}) => ({ key: '0123456789ab', title: 'Why did checkout break?', letter: 'B', name: 'Claude Code', room: 'live', pending: 0, dir: 'checkout-api', held: true, at: '2026-11-17T10:00:00Z', ...o });
+
+test('reads the seats this computer took, by key, live first; none from an older crossroom', () => {
+  const s = R.parseLine(JSON.stringify({ type: 'rooms', rooms: [], seats: [
+    seat({ key: 'aaaaaaaaaaaa', room: 'ended', at: '2026-11-17T12:00:00Z' }),
+    seat(),
+    { key: 'https://x/j/token', title: 'a link is no key' },
+    seat({ key: 'bbbbbbbbbbbb', letter: 'zz', room: 'weird', pending: -1 }),
+  ] }));
+  assert.deepEqual(plain(s.seats.map((x) => x.key)), ['0123456789ab', 'aaaaaaaaaaaa', 'bbbbbbbbbbbb']);
+  assert.equal(s.seats[2].letter, '');
+  assert.equal(s.seats[2].room, 'unreachable');
+  assert.equal(s.seats[2].pending, 0);
+  assert.deepEqual(plain(R.parseLine(line([room()])).seats), []);
+});
+
+test("a seat's row says what waits for its agent, and when no session holds it", () => {
+  assert.deepEqual(plain(R.seatReasons(R.cleanSeat(seat({ pending: 3, held: false })))), [
+    { key: 'seat.pending.other', args: ['3'] },
+    { key: 'seat.unheld', args: [] },
+  ]);
+  assert.equal(R.seatReasons(R.cleanSeat(seat({ pending: 1 })))[0].key, 'seat.pending.one');
+  assert.deepEqual(plain(R.seatReasons(R.cleanSeat(seat({ room: 'ended', pending: 2, held: false })))), []);
+});
+
+test('only a seat key passes to a command', () => {
+  assert.equal(R.safeSeatKey('0123456789ab'), '0123456789ab');
+  for (const bad of ['', '0123456789AB', '0123456789abc', '--open', 'https://x/j/t']) assert.equal(R.safeSeatKey(bad), '', bad);
+});
+
+test("a room's view keeps its newest lines, one line each", () => {
+  let v = [];
+  for (let i = 0; i < 200; i++) v = R.viewAppend(v, `#${i} message`);
+  assert.equal(v.length, 150);
+  assert.equal(v.at(-1), '#199 message');
+  assert.equal(v[0], '#50 message');
+  assert.deepEqual(plain(R.viewAppend(['a'], '   ')), ['a']);
+  assert.equal(R.viewAppend([], `x${String.fromCodePoint(0x2028)}y`)[0], 'x y');
+});

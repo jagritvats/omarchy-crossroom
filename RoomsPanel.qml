@@ -83,6 +83,51 @@ Panel {
 
   Timer { id: copiedReset; interval: 2000; onTriggered: root.copied = "" }
 
+  // ---- one room's own view: its events as `crossroom watch` prints them, one line each
+  property var viewing: null          // the room being read, or null for the list
+  property var viewLines: []
+  property string viewState: ""       // "reading", "done" (the room ended), "failed"
+  function viewRoom(r) {
+    var s = Rooms.safeShort(r.short)
+    if (!s || !root.launcher) return
+    viewProc.running = false
+    root.viewLines = []
+    root.viewState = "reading"
+    root.viewing = r
+    viewProc.command = [root.launcher, "view", s]
+    viewProc.running = true
+  }
+  function stopView() {
+    viewProc.running = false
+    root.viewing = null
+    root.viewLines = []
+    root.viewState = ""
+  }
+  onOpenedChanged: if (!root.opened) stopView()
+
+  Process {
+    id: viewProc
+    stdout: SplitParser { onRead: function(data) { root.viewLines = Rooms.viewAppend(root.viewLines, data) } }
+    onExited: function(code) { if (root.viewing) root.viewState = code === 0 ? "done" : "failed" }
+  }
+
+  // ---- seats agents on this computer took in rooms, anyone's
+  readonly property var joined: hostWidget && hostWidget.state ? hostWidget.state.seats : []
+  function seatReasonText(s) {
+    return Rooms.seatReasons(s).map(function(x) {
+      var t = tr.t(x.key)
+      for (var i = 0; i < x.args.length; i++) t = t.arg(x.args[i])
+      return t
+    })
+  }
+  function seatMeta(s) {
+    var parts = []
+    if (s.letter) parts.push(tr.t("panel.copyLine").arg(s.letter) + (s.name ? " · " + s.name : ""))
+    if (s.dir) parts.push(s.dir)
+    parts.push(tr.t(s.room === "unreachable" ? "state.unknown" : "state." + s.room))
+    return parts.join("  ·  ")
+  }
+
   Process {
     id: newProc
     stdout: StdioCollector { id: newOut }
@@ -143,9 +188,63 @@ Panel {
           spacing: Style.space(10)
 
           Label {
+            visible: !root.viewing
             text: tr.t("panel.title", "Crossroom")
             font.pixelSize: Style.font.title; font.bold: true
           }
+
+          // ---------------- one room, read here
+          Column {
+            visible: !!root.viewing
+            width: parent.width; spacing: Style.space(6)
+            Label {
+              width: parent.width
+              text: root.viewing ? (root.viewing.title || root.viewing.short) : ""
+              textFormat: Text.PlainText
+              font.pixelSize: Style.font.subtitle; font.bold: true
+            }
+            Label {
+              width: parent.width
+              text: root.viewing ? root.viewing.short + "  ·  " + root.stateText(root.viewing) + (root.viewing.host ? "  ·  " + root.viewing.host : "") : ""
+              textFormat: Text.PlainText
+              color: root.dim; font.pixelSize: Style.font.caption
+            }
+            Flow {
+              width: parent.width; spacing: Style.space(4)
+              ActionButton {
+                objectName: "crossroom-back"
+                text: tr.t("panel.back"); iconText: "󰁍"; bordered: true; foreground: root.fg; fontFamily: root.ff
+                onClicked: root.stopView()
+              }
+              ActionButton {
+                text: tr.t("panel.open"); iconText: "󰏌"; bordered: true; foreground: root.fg; fontFamily: root.ff
+                onClicked: { var r = root.viewing; root.close(); if (hostWidget && r) hostWidget.openRoom(r.short) }
+              }
+              ActionButton {
+                text: root.viewing && root.copied === "link:" + root.viewing.id ? tr.t("panel.copied") : tr.t("panel.copyLink")
+                iconText: "󰆏"; bordered: true; foreground: root.fg; fontFamily: root.ff
+                onClicked: if (root.viewing) root.copyLink(root.viewing)
+              }
+            }
+            Label {
+              visible: root.viewLines.length === 0
+              width: parent.width; wrapMode: Text.Wrap; color: root.dim
+              text: root.viewState === "failed" ? tr.t("panel.viewFailed") : tr.t("panel.viewReading")
+            }
+            Repeater {
+              model: root.viewLines
+              delegate: Label {
+                required property var modelData
+                width: col.width; wrapMode: Text.Wrap; elide: Text.ElideNone
+                text: modelData; textFormat: Text.PlainText
+                font.pixelSize: Style.font.caption
+              }
+            }
+          }
+
+          Column {
+            visible: !root.viewing
+            width: parent.width; spacing: Style.space(10)
 
           // ---------------- the crossroom command is missing or too old
           Column {
@@ -182,38 +281,12 @@ Panel {
               width: col.width
               spacing: Style.space(3)
 
-              Item {
+              Label {
                 width: parent.width
-                height: Math.max(title.implicitHeight, openBtn.implicitHeight)
-                Label {
-                  id: title
-                  anchors.left: parent.left; anchors.right: actions.left; anchors.rightMargin: Style.space(6)
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: row.r.title || row.r.short
-                  textFormat: Text.PlainText
-                  elide: Text.ElideRight
-                  font.bold: row.r.needsYou
-                  color: row.r.needsYou ? root.urgent : root.fg
-                }
-                Row {
-                  id: actions
-                  anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                  spacing: Style.space(4)
-                  ActionButton {
-                    id: openBtn
-                    visible: row.r.state !== "gone" && row.r.state !== "unknown"
-                    text: tr.t("panel.open"); iconText: "󰏌"; bordered: true
-                    foreground: root.fg; fontFamily: root.ff
-                    onClicked: { root.close(); if (hostWidget) hostWidget.openRoom(row.r.short) }
-                  }
-                  ActionButton {
-                    visible: row.r.state !== "gone" && row.r.state !== "unknown"
-                    text: root.copied === "link:" + row.r.id ? tr.t("panel.copied") : tr.t("panel.copyLink")
-                    iconText: "󰆏"
-                    bordered: true; foreground: root.fg; fontFamily: root.ff
-                    onClicked: root.copyLink(row.r)
-                  }
-                }
+                text: row.r.title || row.r.short
+                textFormat: Text.PlainText
+                font.bold: row.r.needsYou
+                color: row.r.needsYou ? root.urgent : root.fg
               }
               Label {
                 width: parent.width
@@ -228,6 +301,26 @@ Panel {
                   width: col.width; wrapMode: Text.Wrap
                   text: modelData; textFormat: Text.PlainText
                   color: root.urgent
+                }
+              }
+              Flow {
+                visible: row.r.state !== "gone" && row.r.state !== "unknown"
+                width: parent.width; spacing: Style.space(4)
+                ActionButton {
+                  objectName: "crossroom-view"
+                  text: tr.t("panel.view"); iconText: "󰈈"; bordered: true
+                  foreground: root.fg; fontFamily: root.ff
+                  onClicked: root.viewRoom(row.r)
+                }
+                ActionButton {
+                  text: tr.t("panel.open"); iconText: "󰏌"; bordered: true
+                  foreground: root.fg; fontFamily: root.ff
+                  onClicked: { root.close(); if (hostWidget) hostWidget.openRoom(row.r.short) }
+                }
+                ActionButton {
+                  text: root.copied === "link:" + row.r.id ? tr.t("panel.copied") : tr.t("panel.copyLink")
+                  iconText: "󰆏"; bordered: true; foreground: root.fg; fontFamily: root.ff
+                  onClicked: root.copyLink(row.r)
                 }
               }
               // Seat lines of a room opened from this panel in this session.
@@ -245,6 +338,48 @@ Panel {
                     onClicked: root.copyLine(key, modelData)
                   }
                 }
+              }
+            }
+          }
+
+          // ---------------- seats agents on this computer took
+          PanelSectionHeader {
+            visible: root.joined.length > 0
+            text: tr.t("panel.joined"); foreground: root.fg; fontFamily: root.ff
+          }
+          Repeater {
+            model: root.joined
+            delegate: Column {
+              id: seatRow
+              required property var modelData
+              readonly property var s: modelData
+              width: col.width
+              spacing: Style.space(3)
+              Label {
+                width: parent.width
+                text: seatRow.s.title || tr.t("panel.untitled")
+                textFormat: Text.PlainText
+                color: seatRow.s.room === "live" ? root.fg : root.dim
+              }
+              Label {
+                width: parent.width
+                text: root.seatMeta(seatRow.s)
+                textFormat: Text.PlainText
+                color: root.dim; font.pixelSize: Style.font.caption
+              }
+              Repeater {
+                model: root.seatReasonText(seatRow.s)
+                delegate: Label {
+                  required property var modelData
+                  width: col.width; wrapMode: Text.Wrap
+                  text: modelData; textFormat: Text.PlainText
+                  color: root.accent
+                }
+              }
+              ActionButton {
+                visible: seatRow.s.room !== "unreachable"
+                text: tr.t("panel.openSeat"); iconText: "󰏌"; bordered: true; foreground: root.fg; fontFamily: root.ff
+                onClicked: { root.close(); if (hostWidget) hostWidget.openSeat(seatRow.s.key) }
               }
             }
           }
@@ -311,6 +446,7 @@ Panel {
                 }
               }
             }
+          }
           }
         }
       }
