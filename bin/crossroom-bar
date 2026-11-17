@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# The one program the Crossroom bar widget runs. It finds the `crossroom` command, then does one
+# of a few fixed things with it. Every owner token stays inside `crossroom`: what passes through
+# here is room ids, counts and seat lines, and the private link only ever through a pipe into
+# wl-copy, never on a command line, where any process on the machine could read it.
+#
+#   crossroom-bar which               where `crossroom` is (exit 127 when it is not found)
+#   crossroom-bar watch <seconds>     `crossroom rooms --watch --json`, one state a line
+#   crossroom-bar open <room>         the room's page in the browser (`crossroom open`)
+#   crossroom-bar copy-link <room>    the room's private link onto the clipboard
+#   crossroom-bar copy                stdin onto the clipboard (a seat's line the panel holds)
+#   crossroom-bar new <seats> [<topic>]   a room with every seat free; prints its seat lines as JSON
+#
+# Exit codes: 0 done, 2 a wrong argument, 3 the crossroom command is older than the bar needs,
+# 4 wl-copy is missing, 127 crossroom is not installed.
+set -u
+
+# The first crossroom version that has `rooms --watch` and `new --no-seat`.
+MIN_VERSION="0.3.1"
+
+# The bar's shell starts with a short PATH: add the places npm, mise, bun and pipx-style installs
+# put commands, so `crossroom` and the node it runs on are found as they are in a terminal.
+for d in "$HOME/.local/share/mise/shims" "$HOME/.npm-global/bin" "$HOME/.local/bin" "$HOME/.bun/bin" "$HOME/.volta/bin" /usr/local/bin; do
+  case ":$PATH:" in *":$d:"*) ;; *) [ -d "$d" ] && PATH="$PATH:$d" ;; esac
+done
+export PATH
+
+find_crossroom() {
+  if [ -n "${CROSSROOM_BIN:-}" ] && [ -x "$CROSSROOM_BIN" ]; then printf '%s\n' "$CROSSROOM_BIN"; return 0; fi
+  command -v crossroom 2>/dev/null
+}
+
+# 0 when $1 is at least $2 (plain x.y.z; a prerelease counts as its release).
+version_at_least() {
+  local a b i
+  IFS=. read -r -a a <<<"${1%%-*}"
+  IFS=. read -r -a b <<<"${2%%-*}"
+  for i in 0 1 2; do
+    local x="${a[$i]:-0}" y="${b[$i]:-0}"
+    case "$x" in ''|*[!0-9]*) return 1 ;; esac
+    if [ "$x" -gt "$y" ]; then return 0; fi
+    if [ "$x" -lt "$y" ]; then return 1; fi
+  done
+  return 0
+}
+
+room_ok() { [[ "${1:-}" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{3,79}$ ]]; }
+
+copy_stdin() {
+  command -v wl-copy >/dev/null 2>&1 || { echo "wl-copy is not installed (the wl-clipboard package)." >&2; return 4; }
+  wl-copy
+}
+
+cmd="${1:-}"
+[ $# -gt 0 ] && shift
+
+if [ "$cmd" = "copy" ]; then copy_stdin; exit $?; fi
+
+cr="$(find_crossroom)" || cr=""
+if [ -z "$cr" ]; then
+  echo "The crossroom command is not installed: npm install -g crossroom" >&2
+  exit 127
+fi
+
+case "$cmd" in
+  which)
+    printf '%s\n' "$cr"
+    ;;
+  watch)
+    secs="${1:-20}"
+    [[ "$secs" =~ ^[0-9]{1,4}$ ]] || { echo "watch takes seconds" >&2; exit 2; }
+    v="$("$cr" --version 2>/dev/null | head -n 1)"
+    if [ "$v" != "dev" ] && ! version_at_least "$v" "$MIN_VERSION"; then
+      echo "crossroom $v is older than the bar needs ($MIN_VERSION): npm install -g crossroom" >&2
+      exit 3
+    fi
+    exec "$cr" rooms --watch --json --interval "$secs"
+    ;;
+  open)
+    room_ok "${1:-}" || { echo "open takes a room id" >&2; exit 2; }
+    exec "$cr" open "$1"
+    ;;
+  copy-link)
+    room_ok "${1:-}" || { echo "copy-link takes a room id" >&2; exit 2; }
+    command -v wl-copy >/dev/null 2>&1 || { echo "wl-copy is not installed (the wl-clipboard package)." >&2; exit 4; }
+    set -o pipefail
+    "$cr" open "$1" --print | head -n 1 | tr -d '\n' | wl-copy
+    ;;
+  new)
+    seats="${1:-2}"
+    [[ "$seats" =~ ^([2-9]|1[0-2])$ ]] || { echo "new takes 2 to 12 seats" >&2; exit 2; }
+    topic="${2:-}"
+    # Never read as a flag: the panel already strips leading dashes, and so does this.
+    while [ "${topic#-}" != "$topic" ]; do topic="${topic#-}"; done
+    if [ -n "$topic" ]; then exec "$cr" new "$topic" --no-seat --json --seats "$seats"; fi
+    exec "$cr" new --no-seat --json --seats "$seats"
+    ;;
+  *)
+    echo "usage: crossroom-bar which | watch <seconds> | open <room> | copy-link <room> | copy | new <seats> [<topic>]" >&2
+    exit 2
+    ;;
+esac

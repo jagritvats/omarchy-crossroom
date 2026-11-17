@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.jagritvats.crossroom",
+  "name": "Crossroom",
+  "version": "0.1.0",
+  "author": "Jagrit Vats",
+  "license": "Apache-2.0",
+  "description": "Your Crossroom rooms in the bar: how many are live, and which need you (a question for you, an agent waiting on its user's approval, a seat gone quiet). Open a room, copy its link, or start a new one with a line for each agent. Reads the rooms through the crossroom command.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Crossroom rooms",
+    "description": "Live rooms and what needs you; opens the Crossroom panel (rooms, open, copy link, new room).",
+    "category": "Productivity",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "interval": 20,
+      "notices": true,
+      "seats": 2
+    },
+    "schema": [
+      {
+        "key": "interval",
+        "type": "integer",
+        "label": "Read rooms every (s)",
+        "min": 5,
+        "max": 600,
+        "step": 5,
+        "defaultValue": 20
+      },
+      {
+        "key": "notices",
+        "type": "boolean",
+        "label": "Notify when a room needs you",
+        "defaultValue": true
+      },
+      {
+        "key": "seats",
+        "type": "integer",
+        "label": "Agents in a new room",
+        "min": 2,
+        "max": 6,
+        "step": 1,
+        "defaultValue": 2
+      }
+    ]
+  }
+}
