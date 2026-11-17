@@ -38,7 +38,15 @@ Panel {
   readonly property string ff: bar ? bar.fontFamily : Style.font.family
 
   readonly property string status: hostWidget ? hostWidget.status : "starting"
-  readonly property var listed: hostWidget ? Rooms.shown(hostWidget.rooms, 5) : []
+  readonly property var listed: hostWidget ? Rooms.shown(hostWidget.rooms, 10) : []
+  readonly property var active: hostWidget ? Rooms.activeRooms(hostWidget.rooms) : []
+  readonly property var recent: hostWidget ? Rooms.recentRooms(hostWidget.rooms, 10) : []
+  property int activeShown: 6         // rooms shown before "Show more"
+  property bool recentOpen: false
+  readonly property var activePage: Rooms.paged(root.active, root.activeShown)
+  readonly property var herdr: hostWidget ? hostWidget.herdr : ({ available: false, agents: [] })
+  readonly property var herdrFree: Rooms.herdrFree(root.herdr.agents, hostWidget ? hostWidget.rooms : [])
+  property string herdrKind: ""       // New room: "" gives paste lines; a kind starts that agent in each seat in herdr
   readonly property var newLines: hostWidget ? hostWidget.newLines : ({})
 
   property int seats: hostWidget ? Math.max(2, Math.min(6, Number(hostWidget.setting("seats", 2)) || 2)) : 2
@@ -46,9 +54,10 @@ Panel {
   property var made: null             // the room New room just opened: {id, short, title, lines}
   property string copied: ""          // what was copied last, to say so on its button
   property string topicText: ""       // the topic field, cleared once its room opens
+  readonly property string herdrNote: hostWidget ? hostWidget.herdrNote : ""
 
   function open() { root.controller.show() }
-  function close() { root.controller.hide() }
+  function close() { root.controller.hide(); root.activeShown = 6 }
   function toggle() { root.opened ? close() : open() }
 
   function reasonText(r) {
@@ -64,9 +73,11 @@ Panel {
     if (newProc.running || !root.launcher) return
     root.newState = "opening"
     root.made = null
-    var args = [root.launcher, "new", String(root.seats)]
+    var kind = Rooms.safeKind(root.herdrKind)
+    var args = kind ? [root.launcher, "herdr", "start", String(root.seats), kind] : [root.launcher, "new", String(root.seats)]
     var t = Rooms.topicArg(topic)
     if (t) args.push(t)
+    newProc.started = kind
     newProc.command = args
     newProc.running = true
   }
@@ -135,8 +146,16 @@ Panel {
 
   Process {
     id: newProc
+    property string started: ""     // the herdr agent kind this run starts, or ""
     stdout: StdioCollector { id: newOut }
     onExited: function(code) {
+      if (newProc.started) {
+        // In herdr the agents took every seat: nothing to paste, the room shows once listed.
+        root.newState = code === 0 ? "" : "failed"
+        if (code === 0) { root.topicText = ""; root.herdrNote = tr.t("panel.herdrStarted").arg(root.seats) }
+        if (hostWidget) hostWidget.refreshHerdr()
+        return
+      }
       var room = code === 0 ? Rooms.parseNewRoom(newOut.text) : null
       if (!room) { root.newState = "failed"; return }
       root.newState = ""
@@ -156,6 +175,93 @@ Panel {
     elide: Text.ElideRight
   }
   component ActionButton: Button { focusable: true }
+
+  // One room in the list: what it is, why it needs you, its herdr agents, and what you can do with it.
+  component RoomRow: Column {
+    id: row
+    property var r: ({ id: "", short: "", title: "", host: "", state: "unknown", yourTurn: 0, approval: [], asking: [], away: [], stalled: [], needsYou: false })
+    width: parent ? parent.width : 0
+    spacing: Style.space(3)
+
+    Label {
+      width: parent.width
+      text: row.r.title || row.r.short
+      textFormat: Text.PlainText
+      font.bold: row.r.needsYou
+      color: row.r.needsYou ? root.urgent : root.fg
+    }
+    Label {
+      width: parent.width
+      text: row.r.short + "  ·  " + root.stateText(row.r) + (row.r.host ? "  ·  " + row.r.host : "")
+      textFormat: Text.PlainText
+      color: root.dim; font.pixelSize: Style.font.caption
+    }
+    Repeater {
+      model: root.reasonText(row.r)
+      delegate: Label {
+        required property var modelData
+        width: row.width; wrapMode: Text.Wrap
+        text: modelData; textFormat: Text.PlainText
+        color: root.urgent
+      }
+    }
+    // Its agents running in herdr: what each is doing, and Focus to jump to its pane.
+    Repeater {
+      model: Rooms.herdrIn(root.herdr.agents, row.r)
+      delegate: Row {
+        required property var modelData
+        spacing: Style.space(6)
+        Label {
+          anchors.verticalCenter: parent.verticalCenter
+          text: Rooms.herdrLabel(modelData) + "  ·  " + tr.t("herdr." + modelData.status)
+          textFormat: Text.PlainText
+          color: modelData.status === "blocked" ? root.urgent : root.accent
+          font.pixelSize: Style.font.caption
+        }
+        ActionButton {
+          text: tr.t("panel.focus"); iconText: "󰋱"; bordered: true; foreground: root.fg; fontFamily: root.ff
+          onClicked: { root.close(); if (hostWidget) hostWidget.focusAgent(modelData.pane) }
+        }
+      }
+    }
+    Flow {
+      visible: row.r.state !== "gone" && row.r.state !== "unknown"
+      width: parent.width; spacing: Style.space(4)
+      ActionButton {
+        objectName: "crossroom-view"
+        text: tr.t("panel.view"); iconText: "󰈈"; bordered: true
+        foreground: root.fg; fontFamily: root.ff
+        onClicked: root.viewRoom(row.r)
+      }
+      ActionButton {
+        text: tr.t("panel.open"); iconText: "󰏌"; bordered: true
+        foreground: root.fg; fontFamily: root.ff
+        onClicked: { root.close(); if (hostWidget) hostWidget.openRoom(row.r.short) }
+      }
+      ActionButton {
+        text: root.copied === "link:" + row.r.id ? tr.t("panel.copied") : tr.t("panel.copyLink")
+        iconText: "󰆏"; bordered: true; foreground: root.fg; fontFamily: root.ff
+        onClicked: root.copyLink(row.r)
+      }
+    }
+    // Seat lines of a room opened from this panel in this session.
+    Flow {
+      visible: !!root.newLines[row.r.id] && row.r.state !== "ended"
+      width: parent.width; spacing: Style.space(4)
+      Repeater {
+        model: root.newLines[row.r.id] ? root.newLines[row.r.id].lines : []
+        delegate: ActionButton {
+          required property var modelData
+          required property int index
+          readonly property string key: row.r.id + ":" + index
+          text: root.copied === key ? tr.t("panel.copied") : tr.t("panel.copyLine").arg(String.fromCharCode(65 + index))
+          iconText: "󰆏"; bordered: true; foreground: root.fg; fontFamily: root.ff
+          onClicked: root.copyLine(key, modelData)
+        }
+      }
+    }
+  }
+
 
   Compat.CrossroomKeyboardPanel {
     id: panel
@@ -231,6 +337,24 @@ Panel {
                 onClicked: if (root.viewing) root.copyLink(root.viewing)
               }
             }
+            Repeater {
+              model: root.viewing ? Rooms.herdrIn(root.herdr.agents, root.viewing) : []
+              delegate: Row {
+                required property var modelData
+                spacing: Style.space(6)
+                Label {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: Rooms.herdrLabel(modelData) + "  ·  " + tr.t("herdr." + modelData.status)
+                  textFormat: Text.PlainText
+                  color: modelData.status === "blocked" ? root.urgent : root.accent
+                  font.pixelSize: Style.font.caption
+                }
+                ActionButton {
+                  text: tr.t("panel.focus"); iconText: "󰋱"; bordered: true; foreground: root.fg; fontFamily: root.ff
+                  onClicked: { root.close(); if (hostWidget) hostWidget.focusAgent(modelData.pane) }
+                }
+              }
+            }
             Label {
               visible: root.viewLines.length === 0
               width: parent.width; wrapMode: Text.Wrap; color: root.dim
@@ -277,73 +401,32 @@ Panel {
             width: parent.width; wrapMode: Text.Wrap; color: root.dim
             text: tr.t("panel.empty")
           }
+          // ---------------- rooms that are live or wait for an agent, what needs you first
           Repeater {
-            model: root.listed
-            delegate: Column {
-              id: row
+            model: root.activePage.items
+            delegate: RoomRow {
               required property var modelData
-              readonly property var r: modelData
-              width: col.width
-              spacing: Style.space(3)
+              r: modelData
+            }
+          }
+          ActionButton {
+            visible: root.activePage.more > 0
+            text: tr.t("panel.showMore").arg(root.activePage.more); iconText: "󰅀"; bordered: true; foreground: root.fg; fontFamily: root.ff
+            onClicked: root.activeShown += 6
+          }
 
-              Label {
-                width: parent.width
-                text: row.r.title || row.r.short
-                textFormat: Text.PlainText
-                font.bold: row.r.needsYou
-                color: row.r.needsYou ? root.urgent : root.fg
-              }
-              Label {
-                width: parent.width
-                text: row.r.short + "  ·  " + root.stateText(row.r) + (row.r.host ? "  ·  " + row.r.host : "")
-                textFormat: Text.PlainText
-                color: root.dim; font.pixelSize: Style.font.caption
-              }
-              Repeater {
-                model: root.reasonText(row.r)
-                delegate: Label {
-                  required property var modelData
-                  width: col.width; wrapMode: Text.Wrap
-                  text: modelData; textFormat: Text.PlainText
-                  color: root.urgent
-                }
-              }
-              Flow {
-                visible: row.r.state !== "gone" && row.r.state !== "unknown"
-                width: parent.width; spacing: Style.space(4)
-                ActionButton {
-                  objectName: "crossroom-view"
-                  text: tr.t("panel.view"); iconText: "󰈈"; bordered: true
-                  foreground: root.fg; fontFamily: root.ff
-                  onClicked: root.viewRoom(row.r)
-                }
-                ActionButton {
-                  text: tr.t("panel.open"); iconText: "󰏌"; bordered: true
-                  foreground: root.fg; fontFamily: root.ff
-                  onClicked: { root.close(); if (hostWidget) hostWidget.openRoom(row.r.short) }
-                }
-                ActionButton {
-                  text: root.copied === "link:" + row.r.id ? tr.t("panel.copied") : tr.t("panel.copyLink")
-                  iconText: "󰆏"; bordered: true; foreground: root.fg; fontFamily: root.ff
-                  onClicked: root.copyLink(row.r)
-                }
-              }
-              // Seat lines of a room opened from this panel in this session.
-              Flow {
-                visible: !!root.newLines[row.r.id] && row.r.state !== "ended"
-                width: parent.width; spacing: Style.space(4)
-                Repeater {
-                  model: root.newLines[row.r.id] ? root.newLines[row.r.id].lines : []
-                  delegate: ActionButton {
-                    required property var modelData
-                    required property int index
-                    readonly property string key: row.r.id + ":" + index
-                    text: root.copied === key ? tr.t("panel.copied") : tr.t("panel.copyLine").arg(String.fromCharCode(65 + index))
-                    iconText: "󰆏"; bordered: true; foreground: root.fg; fontFamily: root.ff
-                    onClicked: root.copyLine(key, modelData)
-                  }
-                }
-              }
+          // ---------------- rooms that ended, folded
+          ActionButton {
+            visible: root.recent.length > 0
+            text: tr.t("panel.recent").arg(root.recent.length); iconText: root.recentOpen ? "󰅀" : "󰅂"
+            bordered: false; foreground: root.dim; fontFamily: root.ff
+            onClicked: root.recentOpen = !root.recentOpen
+          }
+          Repeater {
+            model: root.recentOpen ? root.recent : []
+            delegate: RoomRow {
+              required property var modelData
+              r: modelData
             }
           }
 
@@ -389,6 +472,48 @@ Panel {
             }
           }
 
+          // ---------------- agents running in herdr that are in no room yet
+          PanelSectionHeader {
+            visible: root.herdr.available && root.herdrFree.length > 0
+            text: tr.t("panel.herdrAgents"); foreground: root.fg; fontFamily: root.ff
+          }
+          Label {
+            visible: root.herdrNote !== ""
+            width: parent.width; wrapMode: Text.Wrap; color: root.accent
+            text: root.herdrNote; textFormat: Text.PlainText
+          }
+          Repeater {
+            model: root.herdr.available ? Rooms.paged(root.herdrFree, 6).items : []
+            delegate: Column {
+              id: freeRow
+              required property var modelData
+              width: col.width
+              spacing: Style.space(3)
+              Label {
+                width: parent.width
+                text: Rooms.herdrLabel(freeRow.modelData) + "  ·  " + tr.t("herdr." + freeRow.modelData.status)
+                textFormat: Text.PlainText
+              }
+              Flow {
+                width: parent.width; spacing: Style.space(4)
+                ActionButton {
+                  text: tr.t("panel.focus"); iconText: "󰋱"; bordered: true; foreground: root.fg; fontFamily: root.ff
+                  onClicked: { root.close(); if (hostWidget) hostWidget.focusAgent(freeRow.modelData.pane) }
+                }
+                Repeater {
+                  model: Rooms.paged(root.active, 3).items
+                  delegate: ActionButton {
+                    required property var modelData
+                    text: tr.t("panel.into").arg(modelData.title ? modelData.title.slice(0, 18) : modelData.short)
+                    iconText: "󰁔"; bordered: true; foreground: root.fg; fontFamily: root.ff
+                    enabled: freeRow.modelData.status === "idle" || freeRow.modelData.status === "done" || freeRow.modelData.status === "unknown"
+                    onClicked: if (hostWidget) hostWidget.bringAgent(modelData.id, freeRow.modelData.pane)
+                  }
+                }
+              }
+            }
+          }
+
           // ---------------- a new room
           PanelSectionHeader {
             visible: root.status === "ok" || root.status === "stopped"
@@ -416,6 +541,21 @@ Panel {
                   text: String(modelData); bordered: true; fontFamily: root.ff
                   foreground: root.fg; selected: root.seats === modelData
                   onClicked: root.seats = modelData
+                }
+              }
+            }
+            Row {
+              visible: root.herdr.available
+              spacing: Style.space(4)
+              Label { anchors.verticalCenter: parent.verticalCenter; text: tr.t("panel.herdrStart"); color: root.dim }
+              Repeater {
+                model: ["", "claude", "codex", "opencode"]
+                delegate: ActionButton {
+                  required property var modelData
+                  text: modelData ? tr.t("herdr.kind." + modelData) : tr.t("panel.herdrOff")
+                  bordered: true; fontFamily: root.ff; foreground: root.fg
+                  selected: root.herdrKind === modelData
+                  onClicked: root.herdrKind = modelData
                 }
               }
             }

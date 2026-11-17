@@ -54,6 +54,8 @@ test('every string the QML asks for is in i18n/en.json, and every string there i
   // Keys built in lib/rooms.js (reasons, notices) and from a room's state.
   for (const m of read('lib/rooms.js').matchAll(/"((?:room|notice|seat)\.[A-Za-z.]+)"/g)) used.add(m[1]);
   for (const st of ['live', 'open', 'ended', 'gone', 'unknown']) used.add(`state.${st}`);
+  for (const st of ['idle', 'working', 'blocked', 'done', 'unknown']) used.add(`herdr.${st}`);
+  for (const k of ['claude', 'codex', 'opencode']) used.add(`herdr.kind.${k}`);
   for (const k of used) assert.ok(k in en, `missing string: ${k}`);
   // Two section headings are kept for the next panel layout; nothing else may sit unused.
   const spare = new Set(['panel.needsYou', 'panel.rooms']);
@@ -70,10 +72,11 @@ test('every command goes through bin/crossroom-bar with fixed words and room ids
     for (const m of s.matchAll(/command(?:\s*:|\s*=)\s*(\[[^\]]*\]|args)/g)) {
       assert.ok(/^\[root\.launcher\b/.test(m[1]) || m[1] === 'args', `${f}: command ${m[1]}`);
     }
-    for (const m of s.matchAll(/\brun\(\["([^"]+)"/g)) assert.ok(['open', 'copy-link', 'open-seat'].includes(m[1]), `${f}: run ${m[1]}`);
+    for (const m of s.matchAll(/\brun\(\["([^"]+)"/g)) assert.ok(['open', 'copy-link', 'open-seat', 'herdr'].includes(m[1]), `${f}: run ${m[1]}`);
   }
-  // `args` in the panel is built from the launcher, "new", a seat count and the cleaned topic.
-  assert.match(src['RoomsPanel.qml'], /var args = \[root\.launcher, "new", String\(root\.seats\)\]/);
+  // `args` in the panel is built from the launcher, "new", a seat count and the cleaned topic ...
+  // ... or, to start the agents in herdr, from a kind that passed safeKind.
+  assert.match(src['RoomsPanel.qml'], /var kind = Rooms\.safeKind\(root\.herdrKind\)\s*\n\s*var args = kind \? \[root\.launcher, "herdr", "start", String\(root\.seats\), kind\] : \[root\.launcher, "new", String\(root\.seats\)\]/);
   assert.match(src['RoomsPanel.qml'], /var t = Rooms\.topicArg\(topic\)/);
   // A room id passes to a command only through safeShort.
   assert.match(src['BarWidget.qml'], /var s = Rooms\.safeShort\(short\)\s*\n\s*if \(s\) run\(\["open", s\]\)/);

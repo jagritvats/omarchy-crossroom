@@ -9,6 +9,8 @@
 #   crossroom-bar open <room>         the room's page in the browser (`crossroom open`)
 #   crossroom-bar view <room>         the room's events as readable lines, until it ends (`crossroom watch`)
 #   crossroom-bar open-seat <key>     the page of a seat an agent here took (`crossroom seats --open`)
+#   crossroom-bar herdr <command>     herdr's agents and rooms (bin/crossroom-herdr.mjs: agents, start,
+#                                     focus, bring)
 #   crossroom-bar copy-link <room>    the room's private link onto the clipboard
 #   crossroom-bar copy                stdin onto the clipboard (a seat's line the panel holds)
 #   crossroom-bar new <seats> [<topic>]   a room with every seat free; prints its seat lines as JSON
@@ -84,6 +86,11 @@ case "$cmd" in
     room_ok "${1:-}" || { echo "open takes a room id" >&2; exit 2; }
     exec "$cr" open "$1"
     ;;
+  herdr)
+    command -v node >/dev/null 2>&1 || { echo "node is not on PATH" >&2; exit 127; }
+    here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    CROSSROOM_BIN="$cr" exec node "$here/crossroom-herdr.mjs" "$@"
+    ;;
   view)
     room_ok "${1:-}" || { echo "view takes a room id" >&2; exit 2; }
     # The readable form: participants' text arrives one line an event, control characters and
@@ -110,7 +117,7 @@ case "$cmd" in
     exec "$cr" new --no-seat --json --seats "$seats"
     ;;
   *)
-    echo "usage: crossroom-bar which | watch <seconds> | open <room> | view <room> | open-seat <key> | copy-link <room> | copy | new <seats> [<topic>]" >&2
+    echo "usage: crossroom-bar which | watch <seconds> | open <room> | view <room> | open-seat <key> | herdr <command> | copy-link <room> | copy | new <seats> [<topic>]" >&2
     exit 2
     ;;
 esac

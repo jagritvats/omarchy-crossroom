@@ -186,3 +186,41 @@ test('a watch line reads as local time, who, and what they did; bookkeeping is l
   for (const t of ['brief_set', 'session_started', 'participant_state', 'participant_attention']) assert.equal(R.viewLine(`#2 10:00:00 ${t} (crossroom)`, 0), null);
   assert.equal(R.viewLine('crossroom: some notice', 0), 'crossroom: some notice');
 });
+
+test('pages a list, and splits rooms into active (what needs you first) and recent', () => {
+  assert.deepEqual(plain(R.paged([1, 2, 3, 4, 5], 2)), { items: [1, 2], more: 3 });
+  assert.deepEqual(plain(R.paged([1], 6)), { items: [1], more: 0 });
+  const s = R.parseLine(line([
+    room({ id: 'ended-1-aaaa', state: 'ended' }),
+    room({ id: 'live-1-aaaaa', lastActivityAt: '2026-11-17T12:00:00Z' }),
+    room({ id: 'needs-1-aaaa', yourTurn: 1 }),
+    room({ id: 'gone-1-aaaaa', state: 'gone' }),
+  ]));
+  assert.deepEqual(plain(R.activeRooms(s.rooms).map((r) => r.id)), ['needs-1-aaaa', 'live-1-aaaaa']);
+  assert.deepEqual(plain(R.recentRooms(s.rooms).map((r) => r.id)), ['ended-1-aaaa']);
+});
+
+test("reads herdr's agents, and finds those in a room and those free to bring into one", () => {
+  const h = R.parseHerdr(JSON.stringify({ available: true, agents: [
+    { pane: 'w2:p1', name: 'crossroom-W2LH37Cf-a', kind: 'claude', status: 'working', dir: 'api', room: 'W2LH37Cf', letter: 'A' },
+    { pane: 'w3:p1', name: 'mine', kind: 'codex', status: 'idle', dir: 'web', room: '', letter: '' },
+    { pane: 'w4:p1', name: 'old', kind: 'claude', status: 'idle', dir: '', room: 'ENDED123xyz', letter: '' },
+    { pane: 'bad', kind: 'x' },
+    { pane: 'w5:p1', status: 'odd', room: '--x', letter: 'zz' },
+  ] }));
+  assert.equal(h.available, true);
+  assert.equal(h.agents.length, 4);
+  assert.equal(h.agents[3].status, 'unknown');
+  assert.equal(h.agents[3].room, '');
+  const rooms = [room({ id: 'W2LH37Cf6ekB' }), room({ id: 'ENDED123xyzA', state: 'ended' })];
+  assert.deepEqual(plain(R.herdrIn(h.agents, rooms[0]).map((a) => a.pane)), ['w2:p1']);
+  assert.deepEqual(plain(R.herdrFree(h.agents, rooms).map((a) => a.pane)), ['w3:p1', 'w4:p1', 'w5:p1']);
+  assert.equal(R.herdrLabel(h.agents[0]), 'Seat A · claude  ·  api');
+  assert.equal(R.herdrLabel(h.agents[1]), 'codex  ·  web');
+  assert.deepEqual(plain(R.parseHerdr('{"available":false}')), { available: false, agents: [] });
+  assert.deepEqual(plain(R.parseHerdr('junk')), { available: false, agents: [] });
+  assert.equal(R.safePane('w1:p2'), 'w1:p2');
+  assert.equal(R.safePane('w1:p2; x'), '');
+  assert.equal(R.safeKind('codex'), 'codex');
+  assert.equal(R.safeKind('bash'), '');
+});
