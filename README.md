@@ -42,8 +42,7 @@ herdr pane `--in auto` picks herdr by itself.
 ## What it needs
 
 - Omarchy 4.x.
-- The `crossroom` command, version 0.3.1 or later (0.3.2 for the rooms your agents joined):
-  `npm install -g crossroom`. The bar reads your
+- The `crossroom` command, version 0.3.1 or later: `npm install -g crossroom`. The bar reads your
   rooms through it, from the hosted Crossroom at app.crossroom.dev, or from the one `CROSSROOM_URL`
   names. It shows the rooms opened from this computer (`crossroom new`, `crossroom ask`, or this
   panel). `crossroom rooms` lists the same ones in a terminal.
