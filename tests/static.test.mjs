@@ -122,6 +122,27 @@ test('the manifest names files that exist, and its defaults are its schema\'s, e
   assert.ok(manifest.description.length <= 400);
 });
 
+// The shell's qs.Ui as Omarchy 4.5.0 ships it (/usr/share/omarchy/shell/Ui), and the QtQuick and
+// Quickshell types the plugin uses. A type outside these must be defined inline (`component X: …`):
+// `Label` and `ActionButton` are not qs.Ui types, which only the shell's log showed.
+const QS_UI = ['BarIconButton', 'BarWidget', 'Button', 'ButtonGroup', 'Dropdown', 'KeyboardPanel', 'Panel', 'PanelActionButton',
+  'PanelSectionHeader', 'PanelSeparator', 'PanelToolTip', 'TextField', 'Toggle', 'ToggleSwitch', 'WidgetButton', 'FilterInput', 'NumberField'];
+const QT = ['Item', 'Rectangle', 'Text', 'Column', 'Row', 'Flow', 'Repeater', 'Flickable', 'FocusScope', 'Loader', 'Timer', 'MouseArea',
+  'Process', 'SplitParser', 'StdioCollector', 'IpcHandler', 'FileView', 'Connections', 'PanelWindow'];
+
+test('every QML type is the shell\'s, Qt\'s, Quickshell\'s, or defined in the file', () => {
+  for (const [f, s] of Object.entries(src)) {
+    const inline = new Set([...s.matchAll(/component\s+([A-Z]\w*)\s*:/g)].map((m) => m[1]));
+    const c = code(s);
+    for (const m of c.matchAll(/(?:^|[\s:;{])([A-Z][A-Za-z]*(?:\.[A-Z][A-Za-z]*)?)\s*\{/g)) {
+      const t = m[1];
+      if (t.startsWith('Compat.')) assert.ok(existsSync(new URL(`${t.slice(7)}.qml`, root)), `${f}: ${t}`);
+      else if (t.startsWith('Ui.')) assert.ok(QS_UI.includes(t.slice(3)), `${f}: ${t} is not a known type`);
+      else assert.ok(QS_UI.includes(t) || QT.includes(t) || inline.has(t), `${f}: ${t} is not a known type`);
+    }
+  }
+});
+
 test('the QML loads the files it names', () => {
   for (const [f, s] of Object.entries(src)) {
     for (const m of s.matchAll(/(?:Qt\.resolvedUrl\(|import )"([^"]+\.(?:qml|js))"/g)) assert.ok(existsSync(new URL(m[1], root)), `${f}: ${m[1]}`);

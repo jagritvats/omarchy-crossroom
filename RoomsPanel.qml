@@ -94,6 +94,17 @@ Panel {
     }
   }
 
+  // qs.Ui has no Label or ActionButton: they are this panel's own, as in Dolly's. A Label is plain
+  // text unless it says otherwise, so a title an agent wrote can never render as markup.
+  component Label: Text {
+    textFormat: Text.PlainText
+    color: root.fg
+    font.family: root.ff
+    font.pixelSize: Style.font.bodySmall
+    elide: Text.ElideRight
+  }
+  component ActionButton: Button { focusable: true }
+
   Compat.CrossroomKeyboardPanel {
     id: panel
     objectName: "crossroom-panel"
@@ -259,7 +270,7 @@ Panel {
                 delegate: ActionButton {
                   required property var modelData
                   text: String(modelData); bordered: true; fontFamily: root.ff
-                  foreground: root.seats === modelData ? root.accent : root.dim
+                  foreground: root.fg; selected: root.seats === modelData
                   onClicked: root.seats = modelData
                 }
               }
