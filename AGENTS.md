@@ -1,9 +1,8 @@
 # Crossroom for Omarchy: notes for contributors and coding agents
 
 The working brief for anyone (a person or a coding agent) who picks this plugin up. It was written
-on Windows, with no Wayland, Hyprland or Quickshell, so **the QML has never run**. The logic, the
-launcher and the shape of the QML are tested headlessly (below). Everything in "Needs a real Omarchy
-machine" still needs doing on Omarchy 4.x, in a VM or on hardware.
+on Windows and first run on Omarchy 4.5.0 in a VirtualBox VM on 2026-11-17 ("Verified on Omarchy
+4.5.0" below). The logic, the launcher and the shape of the QML are also tested headlessly.
 
 ## What this is
 
@@ -83,7 +82,53 @@ PATH, or `BASH_FOR_TESTS` set.
 The client side (`rooms --watch`, `new --no-seat`) is tested in the Crossroom repository, against a
 real server in process (`apps/server/src/commands/rooms-watch.test.ts`, `new-output.test.ts`).
 
-## Needs a real Omarchy machine
+## Verified on Omarchy 4.5.0 (VirtualBox VM, Hyprland 0.56.2, 2026-11-17)
+
+Against app.crossroom.dev, with crossroom built from the branch that adds `rooms --watch`:
+
+- `omarchy plugin validate .` passes (category `Productivity` accepted); `omarchy plugin add
+  "file://$PWD" --enable --yes` puts the mark in the bar's right section.
+- `bin/crossroom-bar which` finds a mise-installed crossroom through `~/.local/share/mise/shims`.
+- Two agents played with curl: a question to the owner turned the bar to `󰭹 1`, lit, within one
+  pass; the row read "Your turn: an agent asked you a question". A permission prompt reported
+  through `/api/hook/attention/<token>` added "Seat B: waiting for its user to approve a step", and
+  two minutes later "Seat A: quiet, with something waiting for it" (the stall rule).
+- The notice, read with `dbus-monitor` on `org.freedesktop.Notifications.Notify`: app "Crossroom",
+  summary "Crossroom", body "A room needs you.", nothing else.
+- Real clicks: Copy link put the private link on the clipboard; Open opened Chromium on the room as
+  its owner; New room (typed topic, 3 agents) opened a room and its Seat A/B/C buttons each copied
+  that seat's own line, repeatedly; the IPC `open` and `needsYou` answer.
+- `omarchy bar set io.github.jagritvats.crossroom interval 30` restarted the watch at once with
+  `--interval 30`. Ending the rooms cleared the bar; ended rows keep Open and Copy link.
+
+Learned there:
+- `qs.Ui` has no `Label` or `ActionButton`; Dolly defines both inline. The shell logged
+  "Label is not a type" and the panel never opened. `tests/static.test.mjs` now holds every type to
+  the shell's, Qt's, Quickshell's or an inline component.
+- **`omarchy plugin update` can leave the old compile running**: the shell kept reporting an error
+  from the previous file. `omarchy-restart-shell` loads the new one. (`omarchy-refresh-shell`
+  also resets shell.json: don't.)
+- `omarchy-shell <id> open` opens the panel; `omarchy-shell shell summon <id> {}` answers `ok` but
+  did not always open it.
+- The panel's layout moves as the list changes: a script that clicks must take its coordinates from
+  a fresh screenshot.
+- `crossroom open` hands the private link to `xdg-open` as an argument, and a browser it starts
+  keeps it in its own command line for as long as it runs (`/proc/<pid>/cmdline`). That is the
+  client's behaviour, not the plugin's; it is raised in the Crossroom repository.
+
+How it was driven, for next time (no SSH into the VM): `VBoxManage guestcontrol omarchy run
+--username <user> --passwordfile <file> --exe /bin/bash -- -lc '<cmd>'` from Git Bash with
+`MSYS_NO_PATHCONV=1`, the session's variables taken from `/proc/$(pgrep -x quickshell)/environ`;
+`VBoxManage controlvm omarchy screenshotpng`; pointer with
+`hyprctl dispatch "hl.dsp.cursor.move({ x = X, y = Y })"` plus a 1 px `ydotool mousemove` so the
+panel sees motion, clicks with `ydotool click 0xC0` (start `ydotoold` as root with
+`--socket-own=1000:1000`, and stop it after), keys with `wtype`. A command that runs `wl-copy`
+must redirect its output, or the forked clipboard owner holds guestcontrol open.
+
+## Needs a real Omarchy machine (still open)
+
+Rows 1, 2, 5 to 8, 10, 11, 13 and 14 below are done (above). Left: 3 and 4 (no or an old crossroom,
+covered headlessly by `tests/launcher.test.mjs`), 9 with a real agent, 12, 15 to 17.
 
 | # | what | how | expect |
 |---|------|-----|--------|
@@ -105,9 +150,7 @@ real server in process (`apps/server/src/commands/rooms-watch.test.ts`, `new-out
 | 16 | Long titles, 12+ rooms | many rooms | rows elide, the panel scrolls, nothing overflows the screen |
 | 17 | Notice daemon | the shell's notifications | title "Crossroom", body only the count; DND respected |
 
-Things modelled on Dolly but never run here: `Panel` / `KeyboardPanel` geometry (`fittedContentWidth`,
-`fittedContentHeight`), `ActionButton` without `iconText` content, `Process.stdinEnabled` with
-`write()` in `onStarted`, and `SplitParser` on a long-running process.
+Process stdin (the Seat buttons), the panel geometry and `SplitParser` on the long-running watch all ran fine in the VM.
 
 ## Next
 
