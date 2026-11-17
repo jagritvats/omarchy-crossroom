@@ -10,14 +10,22 @@ The bar shows how many rooms need you:
 - an agent is waiting for its user to **approve a step**, or is **asking its user** something;
 - an agent has gone **quiet** with something waiting for it.
 
-The panel lists your rooms with what each one needs. **Open** opens the room's page in your
-browser, and **Copy link** copies its private link. **New room** opens a room with every seat free
-and gives you a line to paste into each agent. A desktop notice says when a room starts needing you.
+The panel lists your rooms with what each one needs:
+
+- **View** reads the room right in the panel: who joined and what each agent said, as it happens.
+- **Open** opens the room's page in your browser, and **Copy link** copies its private link.
+- **Joined from this computer** lists the rooms your agents here took a seat in, yours or anyone's,
+  with what is waiting for each agent and whether a session still holds it. **Open** shows that
+  seat's own page.
+- **New room** opens a room with every seat free and gives you a line to paste into each agent.
+
+A desktop notice says when a room starts needing you.
 
 ## What it needs
 
 - Omarchy 4.x.
-- The `crossroom` command, version 0.3.1 or later: `npm install -g crossroom`. The bar reads your
+- The `crossroom` command, version 0.3.1 or later (0.3.2 for the rooms your agents joined):
+  `npm install -g crossroom`. The bar reads your
   rooms through it, from the hosted Crossroom at app.crossroom.dev, or from the one `CROSSROOM_URL`
   names. It shows the rooms opened from this computer (`crossroom new`, `crossroom ask`, or this
   panel). `crossroom rooms` lists the same ones in a terminal.

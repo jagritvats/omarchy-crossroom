@@ -101,7 +101,21 @@ Against app.crossroom.dev, with crossroom built from the branch that adds `rooms
 - `omarchy bar set io.github.jagritvats.crossroom interval 30` restarted the watch at once with
   `--interval 30`. Ending the rooms cleared the bar; ended rows keep Open and Copy link.
 
+Second pass, the same day, with crossroom built from the branch that adds `seats` to each line and
+`seats --open`:
+
+- **View** on a room opened the room in the panel: its history as "18:04  A Payments: …",
+  "… joined", local time, the bookkeeping events left out (`viewLine`). A message seat B said while
+  it was open appeared within seconds. Back returned to the list.
+- **Joined from this computer** listed a seat recorded with `crossroom seat <link>`: "Seat B ·
+  Checkout · crossroom-test · Live", "1 new for its agent", "No session holds it: /crossroom:resume
+  takes it up". Open on it opened the seat's own page (`/seat#t=`, "You are Agent B").
+- The room's own row read "Seat B: quiet, with something waiting for it" at the same time: the
+  stall rule and the joined seat's count agree.
+
 Learned there:
+- A long one-line `guestcontrol run` failed with `VERR_NOT_SUPPORTED`; the same commands as a
+  script copied in (`guestcontrol copyto`) ran. Keep scenes in a script file.
 - `qs.Ui` has no `Label` or `ActionButton`; Dolly defines both inline. The shell logged
   "Label is not a type" and the panel never opened. `tests/static.test.mjs` now holds every type to
   the shell's, Qt's, Quickshell's or an inline component.
