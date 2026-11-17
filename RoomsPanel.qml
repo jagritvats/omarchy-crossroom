@@ -56,7 +56,7 @@ Panel {
   property string topicText: ""       // the topic field, cleared once its room opens
   readonly property string herdrNote: hostWidget ? hostWidget.herdrNote : ""
 
-  function open() { root.controller.show() }
+  function open() { root.controller.show(); if (hostWidget) hostWidget.retryWatch() }
   function close() { root.controller.hide(); root.activeShown = 6 }
   function toggle() { root.opened ? close() : open() }
 

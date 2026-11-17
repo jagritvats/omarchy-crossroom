@@ -110,6 +110,12 @@ BarWidget {
     }
   }
 
+  // The panel opened while the watch was down: try again now rather than at the end of its pause.
+  function retryWatch() {
+    if (watchProc.running || root.status === "ok" || root.status === "starting") return
+    restart.stop()
+    startWatch()
+  }
   function startWatch() {
     watchProc.command = [root.launcher, "watch", String(root.intervalS())]
     watchProc.running = true
@@ -163,7 +169,8 @@ BarWidget {
       else if (code === 3) root.status = "old"
       else root.status = "stopped"
       root.failures++
-      restart.interval = (code === 127 || code === 3) ? 300000 : Rooms.backoffMs(root.failures)
+      // Missing or too old: look again each minute (and at once when the panel opens), so an install shows soon.
+      restart.interval = (code === 127 || code === 3) ? 60000 : Rooms.backoffMs(root.failures)
       restart.restart()
     }
   }

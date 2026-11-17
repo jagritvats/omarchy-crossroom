@@ -148,7 +148,7 @@ covered headlessly by `tests/launcher.test.mjs`), 9 with a real agent, 12, 15 to
 |---|------|-----|--------|
 | 1 | Manifest | `omarchy plugin validate .` | passes. `category: "Productivity"` is a guess and may need to be a value the shell knows |
 | 2 | Install | commit, then `omarchy plugin add "file://$PWD" --enable --yes` | the mark appears in the bar's right section; `qs log` shows no QML errors |
-| 3 | No crossroom | uninstall the CLI, reload the shell | tooltip and panel say to install it; the watch retries every 5 min, not in a loop |
+| 3 | No crossroom | uninstall the CLI, reload the shell | tooltip and panel say to install it; the watch tries again each minute, and at once when the panel opens; never in a loop |
 | 4 | Old crossroom | install 0.3.0 | "update the crossroom command"; exit 3 path |
 | 5 | Shell PATH | install crossroom with npm under mise | `bin/crossroom-bar which` from the shell finds it (`~/.local/share/mise/shims`); if not, add the dir to the launcher's list |
 | 6 | Rooms show | `crossroom new "test" --seats 2` in a terminal, paste a line into Claude Code | the room appears live in the panel; Open opens it in the browser with its key |
